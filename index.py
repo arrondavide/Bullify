@@ -1,13 +1,20 @@
 import yfinance as yf
-import numpy as np
+from datetime import datetime, timedelta
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 import pandas as pd
-import plotly.graph_objs as go
+import plotly.graph_objects as go
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
 from keras.layers import Dense, LSTM
+import numpy as np
 
-st.title("Bullify")
+# Ensure you have the VADER lexicon downloaded
+nltk.download('vader_lexicon')
+
+# Initialize VADER sentiment analyzer
+sia = SentimentIntensityAnalyzer()
 
 # Define the list of stock symbols and their names
 stock_symbols = {
@@ -21,9 +28,13 @@ stock_symbols = {
     "DINO": "HF Sinclair"
 }
 
-# Sidebar navigation
-page = st.sidebar.radio("Navigation", ["Stock Prediction", "Live Market"])
+# Streamlit app title
+st.title("Bullify")
 
+# Sidebar navigation
+page = st.sidebar.radio("Navigation", ["Stock Prediction", "Live Market", "Market Sentiment"])
+
+# Stock Prediction page
 if page == "Stock Prediction":
     # Load stock data based on selected symbol and predict
     selected_stock = st.sidebar.selectbox("Select Stock Symbol", list(stock_symbols.keys()))
@@ -191,6 +202,7 @@ if page == "Stock Prediction":
             num_days = st.sidebar.number_input("Enter number of days for prediction", value=30)
             predict_and_recommend(num_days)
 
+# Live Market page
 elif page == "Live Market":
     st.subheader("Live Stock Market Data")
 
@@ -207,3 +219,73 @@ elif page == "Live Market":
         st.write("Live Data:")
         for key, value in live_data.items():
             st.write(f"{key}: {value}")
+
+# Market Sentiment page
+elif page == "Market Sentiment":
+    st.subheader("Market Sentiment Analysis")
+
+    # Fetch stock news based on selected symbol
+    selected_stock = st.sidebar.selectbox("Select Stock Symbol", list(stock_symbols.keys()))
+    
+    if selected_stock:
+        st.write(f"Analyzing sentiment for: {stock_symbols[selected_stock]} ({selected_stock})")
+        
+        # Define the date range
+        end_date = datetime.today()
+        start_date = end_date - timedelta(days=30)  # Past month
+        
+        # Fetch stock news
+        ticker = yf.Ticker(selected_stock)
+        news = ticker.news
+        
+        # Filter news for the past month and analyze sentiment
+        news_data = []
+        for article in news:
+            publish_time = datetime.fromtimestamp(article['providerPublishTime'])
+            if publish_time >= start_date:
+                title = article['title']
+                link = article['link']
+                # Analyze sentiment
+                sentiment = sia.polarity_scores(title)
+                news_data.append({
+                    'Title': title,
+                    'Published at': publish_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'Link': link,
+                    'Compound': sentiment['compound'],
+                    'Positive': sentiment['pos'],
+                    'Neutral': sentiment['neu'],
+                    'Negative': sentiment['neg']
+                })
+        
+        # Create a DataFrame
+        df = pd.DataFrame(news_data)
+
+        if not df.empty:
+            # Display sentiment data
+            st.write("Sentiment Data for the past month:")
+            st.dataframe(df[['Title', 'Published at', 'Compound', 'Positive', 'Neutral', 'Negative', 'Link']])
+            
+            # Plot pie chart for sentiment distribution
+            sentiment_counts = df[['Positive', 'Neutral', 'Negative']].mean()
+            fig_pie = go.Figure(data=[go.Pie(labels=sentiment_counts.index,
+                                             values=sentiment_counts.values,
+                                             title='Average Sentiment Distribution')])
+            st.plotly_chart(fig_pie)
+            
+            # Plot bar chart for sentiment scores
+            fig_bar = go.Figure(data=[
+                go.Bar(name='Positive', x=df['Published at'], y=df['Positive']),
+                go.Bar(name='Neutral', x=df['Published at'], y=df['Neutral']),
+                go.Bar(name='Negative', x=df['Published at'], y=df['Negative'])
+            ])
+            fig_bar.update_layout(barmode='stack', title='Sentiment Scores Over Time')
+            st.plotly_chart(fig_bar)
+            
+            # Provide a recommendation based on average sentiment
+            average_sentiment = df['Compound'].mean()
+            recommendation = "Buy" if average_sentiment > 0.2 else "Sell" if average_sentiment < -0.2 else "Hold"
+            
+            st.write(f"Average Sentiment Score: {average_sentiment:.2f}")
+            st.write(f"Recommendation: {recommendation}")
+        else:
+            st.write("No news articles found for the selected stock in the past month.")
