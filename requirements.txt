@@ -5,5 +5,5 @@ streamlit
 yfinance
 nltk
 scikit-learn
-keras
-tensorflow
+keras == 3.4.1
+tensorflow == 2.16.1
