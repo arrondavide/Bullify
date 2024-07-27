@@ -3,4 +3,3 @@ pandas
 plotly
 streamlit
 yfinance
-app
