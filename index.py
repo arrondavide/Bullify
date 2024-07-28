@@ -29,8 +29,7 @@ stock_symbols = {
     "DINO": "HF Sinclair"
 }
 
-# Streamlit app title
-st.title("Bullify")
+
 
 # Sidebar navigation
 page = st.sidebar.radio("Navigation", ["Stock Prediction", "Live Market", "Market Sentiment"])
