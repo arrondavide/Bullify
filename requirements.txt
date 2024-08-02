@@ -1,1 +1,9 @@
+numpy
+pandas
+plotly
 streamlit
+yfinance
+nltk
+scikit-learn
+keras == 3.4.1
+tensorflow == 2.17.0
